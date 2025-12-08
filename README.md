@@ -1,4 +1,4 @@
-#aicd
+# aicd
 
 AI automatically generates deployment-related code for GitHub repositories based on their content.
 * Automatically generate Dockerfile (if none exists)
