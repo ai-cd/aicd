@@ -57,6 +57,22 @@ export async function POST(request: Request) {
       userId: session.user.id
     }
   });
+  
+    try {
+      const account = await prisma.account.findFirst({
+        where: { userId: session.user.id, provider: "github" }
+      });
+
+      if (account?.access_token) {
+        const { owner, repo } = parsed;
+        
+        import("@/lib/auto-yaml").then(m => {
+          m.autoAnalyzeAndPushSealos(account.access_token!, session.user.id, owner, repo);
+        }).catch(err => console.error("Auto-YAML background task failed:", err));
+      }
+    } catch (e) {
+      console.error("Failed to trigger auto-yaml logic:", e);
+    }
 
   return NextResponse.json({ project });
 }
