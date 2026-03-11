@@ -11,6 +11,7 @@
     "prisma:migrate": "prisma migrate dev"
   },
   "dependencies": {
+    "@ai-cd/sealos-skills": "file:../IntelliDeploySkills",
     "@auth/prisma-adapter": "2.11.1",
     "@kubernetes/client-node": "0.20.0",
     "@prisma/client": "5.18.0",

@@ -1,12 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import {
-  buildDatabaseManifests,
-  buildRuntimeManifests,
-  serializeManifests
-} from "@/lib/sealos";
-import { applyManifests } from "@/lib/k8s";
+import { createSkillsForUser } from "@/lib/k8s";
+import { slugify } from "@/lib/sealos";
 
 export async function POST(
   request: Request,
@@ -16,9 +12,6 @@ export async function POST(
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-
-  const body = await request.json().catch(() => ({}));
-  const dryRun = Boolean(body?.dryRun);
 
   const project = await prisma.project.findFirst({
     where: { id: params.id, userId: session.user.id },
@@ -30,49 +23,69 @@ export async function POST(
   }
 
   if (!project.user.kubeconfig) {
-    return NextResponse.json({ error: "Kubeconfig not configured" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Kubeconfig not configured — please paste your Sealos kubeconfig in the console first." },
+      { status: 400 }
+    );
   }
 
+  // ---- Derive deploy parameters from the AI analysis ----
   const ports = project.analysis.ports
     .split(",")
-    .map((value) => Number.parseInt(value.trim(), 10))
-    .filter((value) => !Number.isNaN(value));
+    .map((v) => Number.parseInt(v.trim(), 10))
+    .filter((v) => !Number.isNaN(v));
+  const mainPort = ports[0] || 3000;
 
-  const runtime = await buildRuntimeManifests({
-    projectName: project.name,
-    baseImage: project.analysis.baseImage,
-    ports: ports.length > 0 ? ports : [3000]
-  });
+  const domainSuffix = process.env.SEALOS_DOMAIN_SUFFIX ?? "usw.sealos.io";
+  const appName = slugify(project.name) || "project";
+  const domain = `${appName}.${domainSuffix}`;
 
-  const manifests = [...runtime.manifests];
-  let databaseName: string | null = null;
+  // ---- Create a per-request Skills instance from the user's kubeconfig ----
+  const skills = createSkillsForUser(project.user.kubeconfig);
+  const results: Array<{ step: string; success: boolean; message: string; data?: any }> = [];
 
-  if (project.analysis.needsDatabase) {
-    const database = await buildDatabaseManifests(project.name);
-    databaseName = database.dbName;
-    manifests.push(...database.manifests);
-  }
-
-  if (dryRun) {
-    return NextResponse.json({
-      manifests: serializeManifests(manifests),
-      runtimeName: runtime.runtimeName,
-      ingressDomain: runtime.ingressDomain,
-      databaseName
+  // 1. Deploy the container (Deployment + Service + Ingress)
+  try {
+    const deployResult = await skills.deploy({
+      name: appName,
+      image: project.analysis.baseImage,
+      port: mainPort,
+      enableIngress: project.analysis.needsIngress,
+      domain,
+      envVars: (project.analysis.envVars as Record<string, string>) ?? undefined
     });
+    results.push({ step: "deploy", ...deployResult });
+  } catch (error: any) {
+    console.error("[deploy] Skills deploy error:", error);
+    results.push({ step: "deploy", success: false, message: error?.message ?? "Unknown error" });
   }
 
-  const results = await applyManifests(manifests as any, project.user.kubeconfig);
-  const status = results.some((item) => item.status === "failed")
-    ? "failed"
-    : "applied";
+  // 2. Optionally create a database
+  let databaseName: string | null = null;
+  if (project.analysis.needsDatabase) {
+    databaseName = `${appName}-db`;
+    try {
+      const dbResult = await skills.createDB({
+        name: databaseName,
+        type: "postgresql"
+      });
+      results.push({ step: "database", ...dbResult });
+    } catch (error: any) {
+      console.error("[deploy] Skills createDB error:", error);
+      results.push({ step: "database", success: false, message: error?.message ?? "Unknown error" });
+    }
+  }
+
+  // ---- Persist deployment record ----
+  const allSucceeded = results.every((r) => r.success);
+  const status = allSucceeded ? "applied" : "failed";
 
   const deployment = await prisma.deployment.create({
     data: {
       projectId: project.id,
       status,
-      runtimeName: runtime.runtimeName,
-      ingressDomain: runtime.ingressDomain,
+      runtimeName: appName,
+      ingressDomain: domain,
       databaseName,
       log: JSON.stringify(results)
     }
