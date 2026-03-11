@@ -12,6 +12,7 @@ const securityHeaders = [
 const nextConfig = {
   reactStrictMode: true,
   experimental: {
+    instrumentationHook: true,
     serverActions: { bodySizeLimit: "4mb" }
   },
   headers: async () => [

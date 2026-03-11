@@ -7,6 +7,7 @@ export default function ProjectActions({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [prUrl, setPrUrl] = useState<string | null>(null);
   const [previewMeta, setPreviewMeta] = useState<{
     runtimeName: string;
     ingressDomain?: string;
@@ -16,6 +17,7 @@ export default function ProjectActions({ projectId }: { projectId: string }) {
   async function runAnalysis() {
     setLoading("analysis");
     setMessage(null);
+    setPrUrl(null);
     try {
       const response = await fetch(`/api/projects/${projectId}/analyze`, {
         method: "POST"
@@ -34,6 +36,7 @@ export default function ProjectActions({ projectId }: { projectId: string }) {
   async function deploy() {
     setLoading("deploy");
     setMessage(null);
+    setPrUrl(null);
     try {
       const response = await fetch(`/api/projects/${projectId}/deploy`, {
         method: "POST",
@@ -54,6 +57,7 @@ export default function ProjectActions({ projectId }: { projectId: string }) {
   async function dryRun() {
     setLoading("dryrun");
     setMessage(null);
+    setPrUrl(null);
     try {
       const response = await fetch(`/api/projects/${projectId}/deploy`, {
         method: "POST",
@@ -72,6 +76,56 @@ export default function ProjectActions({ projectId }: { projectId: string }) {
       });
     } catch (error) {
       setMessage("预览失败，请先完成分析");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function autoGenerateSealosYaml() {
+    setLoading("auto-yaml");
+    setMessage(null);
+    setPrUrl(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/auto-yaml`, {
+        method: "POST"
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error ?? "auto-yaml failed");
+      }
+      if (data.prUrl) {
+        setPrUrl(data.prUrl);
+        setMessage("Sealos YAML 已生成并创建 PR！");
+      } else {
+        setMessage(data.message ?? "操作完成");
+      }
+    } catch (error: any) {
+      setMessage(`生成 Sealos YAML 失败: ${error.message}`);
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function autoBuildDocker() {
+    setLoading("auto-docker");
+    setMessage(null);
+    setPrUrl(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/auto-docker`, {
+        method: "POST"
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error ?? "auto-docker failed");
+      }
+      if (data.prUrl) {
+        setPrUrl(data.prUrl);
+        setMessage("Dockerfile + CI 工作流已生成并创建 PR！");
+      } else {
+        setMessage(data.message ?? "操作完成");
+      }
+    } catch (error: any) {
+      setMessage(`生成 Docker 配置失败: ${error.message}`);
     } finally {
       setLoading(null);
     }
@@ -98,7 +152,38 @@ export default function ProjectActions({ projectId }: { projectId: string }) {
           {loading === "deploy" ? "部署中..." : "开始部署"}
         </Button>
       </div>
+
+      <div className="flex flex-wrap gap-3 border-t border-foreground pt-3">
+        <Button
+          onClick={autoGenerateSealosYaml}
+          variant="outline"
+          disabled={loading !== null}
+        >
+          {loading === "auto-yaml" ? "生成中..." : "Auto Generate Sealos YAML"}
+        </Button>
+        <Button
+          onClick={autoBuildDocker}
+          variant="outline"
+          disabled={loading !== null}
+        >
+          {loading === "auto-docker" ? "生成中..." : "Auto Build Docker Image"}
+        </Button>
+      </div>
+
       {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
+      {prUrl ? (
+        <p className="text-sm">
+          PR 链接:{" "}
+          <a
+            href={prUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline text-blue-600"
+          >
+            {prUrl}
+          </a>
+        </p>
+      ) : null}
       {preview ? (
         <div className="space-y-2 border border-foreground bg-background p-4">
           <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">

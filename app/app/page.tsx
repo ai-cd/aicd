@@ -6,12 +6,18 @@ import SiteHeader from "@/components/site-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ProjectCreateForm from "@/components/project-create-form";
+import KubeconfigForm from "@/components/kubeconfig-form";
 
 export default async function AppPage() {
   const session = await auth();
   if (!session?.user?.id) {
     redirect("/auth/signin");
   }
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { kubeconfig: true }
+  });
 
   const projects = await prisma.project.findMany({
     where: { userId: session.user.id },
@@ -29,6 +35,16 @@ export default async function AppPage() {
             <p className="text-muted-foreground">
               创建 Project，连接 GitHub 仓库并在 Sealos 上部署。
             </p>
+
+            <Card className="border-foreground/50 bg-muted/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">集群凭证</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <KubeconfigForm hasKubeconfig={!!user?.kubeconfig} />
+              </CardContent>
+            </Card>
+
             <Card className="border-foreground">
               <CardHeader>
                 <CardTitle>新建 Project</CardTitle>

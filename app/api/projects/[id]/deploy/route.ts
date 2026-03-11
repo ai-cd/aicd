@@ -22,11 +22,15 @@ export async function POST(
 
   const project = await prisma.project.findFirst({
     where: { id: params.id, userId: session.user.id },
-    include: { analysis: true }
+    include: { analysis: true, user: true }
   });
 
   if (!project || !project.analysis) {
     return NextResponse.json({ error: "Missing analysis" }, { status: 400 });
+  }
+
+  if (!project.user.kubeconfig) {
+    return NextResponse.json({ error: "Kubeconfig not configured" }, { status: 400 });
   }
 
   const ports = project.analysis.ports
@@ -58,7 +62,7 @@ export async function POST(
     });
   }
 
-  const results = await applyManifests(manifests as any);
+  const results = await applyManifests(manifests as any, project.user.kubeconfig);
   const status = results.some((item) => item.status === "failed")
     ? "failed"
     : "applied";
