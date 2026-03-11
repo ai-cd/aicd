@@ -25,6 +25,11 @@ export default function ProjectCreateForm({
       setLoadingRepos(true);
       try {
         const response = await fetch("/api/github/repos");
+        if (response.status === 401) {
+          // Token expired / bad credentials — force re-sign-in
+          window.location.href = "/auth/signin";
+          return;
+        }
         if (!response.ok) {
           throw new Error("failed");
         }
@@ -60,15 +65,21 @@ export default function ProjectCreateForm({
         body: JSON.stringify({ repoUrl })
       });
 
+      if (response.status === 401) {
+        window.location.href = "/auth/signin";
+        return;
+      }
+
       if (!response.ok) {
-        throw new Error("Failed to create project");
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to create project");
       }
 
       setRepoUrl("");
       onCreated?.();
       router.refresh();
-    } catch (err) {
-      setError("创建失败，请检查 GitHub 地址或权限");
+    } catch (err: any) {
+      setError(err?.message ?? "创建失败，请检查 GitHub 地址或权限");
     } finally {
       setLoading(false);
     }

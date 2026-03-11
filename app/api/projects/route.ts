@@ -44,19 +44,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ project: existing });
   }
 
-  const repo = await getRepoMeta(session.user.id, parsed.owner, parsed.repo);
+  try {
+    const repo = await getRepoMeta(session.user.id, parsed.owner, parsed.repo);
 
-  const project = await prisma.project.create({
-    data: {
-      name: repo.name,
-      repoUrl: repo.html_url,
-      repoOwner: repo.owner.login,
-      repoName: repo.name,
-      visibility: repo.visibility ?? (repo.private ? "private" : "public"),
-      defaultBranch: repo.default_branch,
-      userId: session.user.id
-    }
-  });
+    const project = await prisma.project.create({
+      data: {
+        name: repo.name,
+        repoUrl: repo.html_url,
+        repoOwner: repo.owner.login,
+        repoName: repo.name,
+        visibility: repo.visibility ?? (repo.private ? "private" : "public"),
+        defaultBranch: repo.default_branch,
+        userId: session.user.id
+      }
+    });
 
-  return NextResponse.json({ project });
+    return NextResponse.json({ project });
+  } catch (error: any) {
+    console.error("[/api/projects POST]", error);
+    const msg = error?.message ?? "Failed to create project";
+    const status = msg.includes("token missing") ? 401 : 500;
+    return NextResponse.json({ error: msg }, { status });
+  }
 }

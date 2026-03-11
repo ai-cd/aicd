@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "env -u http_proxy -u https_proxy -u all_proxy -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -11,6 +11,7 @@
     "prisma:migrate": "prisma migrate dev"
   },
   "dependencies": {
+    "@ai-cd/sealos-skills": "file:../IntelliDeploySkills",
     "@auth/prisma-adapter": "2.11.1",
     "@kubernetes/client-node": "0.20.0",
     "@prisma/client": "5.18.0",
@@ -38,6 +39,8 @@
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
     "autoprefixer": "10.4.20",
+    "http-proxy-agent": "^7.0.2",
+    "https-proxy-agent": "^7.0.6",
     "postcss": "8.4.47",
     "prisma": "5.18.0",
     "tailwindcss": "3.4.10",

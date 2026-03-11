@@ -11,10 +11,11 @@ const authConfig: NextAuthConfig = {
     GitHub({
       clientId: process.env.GITHUB_CLIENT_ID ?? "",
       clientSecret: process.env.GITHUB_CLIENT_SECRET ?? "",
-      authorization: { params: { scope: "read:user user:email repo" } }
+      authorization: { params: { scope: "read:user user:email repo" } },
+      allowDangerousEmailAccountLinking: true
     })
   ],
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: process.env.AUTH_SECRET,
   pages: {
     signIn: "/auth/signin"
   },

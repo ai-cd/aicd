@@ -11,7 +11,10 @@ export async function GET() {
   try {
     const repos = await listGitHubRepos(session.user.id);
     return NextResponse.json({ repos });
-  } catch (error) {
-    return NextResponse.json({ error: "Failed to fetch repos" }, { status: 500 });
+  } catch (error: any) {
+    console.error("[/api/github/repos]", error);
+    const msg = error?.message ?? "Failed to fetch repos";
+    const status = msg.includes("token missing") ? 401 : 500;
+    return NextResponse.json({ error: msg }, { status });
   }
 }
